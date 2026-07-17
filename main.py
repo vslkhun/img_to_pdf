@@ -6,6 +6,10 @@ import os
 # Import drag-and-drop architecture extensions
 from tkinterdnd2 import TkinterDnD, DND_FILES
 
+# Import PDF conversion engine and system exception guardrails
+from pdf2image import convert_from_path
+from pdf2image.exceptions import PDFInfoNotInstalledError
+
 class ImageToPdfApp:
     def __init__(self, root):
         self.root = root
@@ -85,7 +89,7 @@ class ImageToPdfApp:
         # Instructions
         instruction_label = tk.Label(
             self.workspace, 
-            text="Drop files here / Ctrl+V to Paste | Click thumbnail to view | Drag thumbnails to reorder", 
+            text="Drop Image/PDF / Ctrl+V to Paste | Click thumbnail to view | Drag thumbnails to reorder", 
             font=("Arial", 11), bg="#f5f5f5", fg="#555"
         )
         instruction_label.grid(row=0, column=0, pady=(0, 10), sticky="ew")
@@ -141,7 +145,7 @@ class ImageToPdfApp:
             self.canvas.delete("all")
             w = self.canvas.winfo_width() if self.canvas.winfo_width() > 1 else 500
             h = self.canvas.winfo_height() if self.canvas.winfo_height() > 1 else 350
-            self.canvas_text = self.canvas.create_text(w//2, h//2, text="[ Drop File or Paste Here ]", fill="#aaa", font=("Arial", 14, "italic"))
+            self.canvas_text = self.canvas.create_text(w//2, h//2, text="[ Drop Image/PDF or Paste Here ]", fill="#aaa", font=("Arial", 14, "italic"))
 
     def on_layout_slider_change(self, event=None):
         """Monitors modifications made to the sizes via the scale sliders."""
@@ -171,12 +175,15 @@ class ImageToPdfApp:
                 self.process_and_store_image(img)
             elif isinstance(img, list):
                 for path in img:
-                    if os.path.isfile(path) and path.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.gif')):
-                        self.process_and_store_image(Image.open(path))
+                    if os.path.isfile(path):
+                        if path.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.gif')):
+                            self.process_and_store_image(Image.open(path))
+                        elif path.lower().endswith('.pdf'):
+                            self.load_pdf_pages(path)
             else:
-                messagebox.showwarning("Paste Failed", "No valid image found in clipboard!")
+                messagebox.showwarning("Paste Failed", "No valid image or file path found in clipboard!")
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to paste image: {str(e)}")
+            messagebox.showerror("Error", f"Failed to paste element: {str(e)}")
 
     def process_and_store_image(self, pil_img):
         if not self.image_list:
@@ -390,20 +397,23 @@ class ImageToPdfApp:
         else:
             paths = [p.strip() for p in raw_data.split() if p.strip()]
 
-        valid_extensions = ('.png', '.jpg', '.jpeg', '.bmp', '.gif', '.webp', '.tiff')
+        valid_extensions = ('.png', '.jpg', '.jpeg', '.bmp', '.gif', '.webp', '.tiff', '.pdf')
         loaded_any = False
 
         for path in paths:
             path = path.strip('"').strip("'")
             if os.path.isfile(path) and path.lower().endswith(valid_extensions):
                 try:
-                    self.load_image_from_path(path)
+                    if path.lower().endswith('.pdf'):
+                        self.load_pdf_pages(path)
+                    else:
+                        self.load_image_from_path(path)
                     loaded_any = True
                 except Exception as e:
                     print(f"Error parsing asset target payload: {e}")
                     
         if not loaded_any:
-            messagebox.showwarning("Format Warning", "Dropped files must be valid image formats!")
+            messagebox.showwarning("Format Warning", "Dropped files must be valid image or PDF formats!")
 
     def load_image_from_path(self, path):
         """Decoupled helper to load standalone localized disk images directly into the runtime sequence."""
@@ -426,6 +436,31 @@ class ImageToPdfApp:
         
         # Re-render the canvas visualization
         self.update_main_canvas(self.image_list[self.selected_index])
+
+    def load_pdf_pages(self, path):
+        """Converts each page of a dropped/pasted PDF into an image and pushes it to storage."""
+        try:
+            # Convert PDF pages directly to a list of PIL Images in memory
+            # Note: If poppler is not in your system path on Windows, pass poppler_path=r"C:\Program Files\Poppler\bin"
+            pages = convert_from_path(path)
+            
+            if not pages:
+                return
+
+            for page in pages:
+                self.process_and_store_image(page)
+                
+        except PDFInfoNotInstalledError:
+            # Trap missing background binary error cleanly and point out immediate fix
+            messagebox.showerror(
+                "System Dependency Missing", 
+                "Poppler is required to convert PDF files into images.\n\n"
+                "Please open your command prompt/terminal and execute:\n"
+                "winget install oschwartz10612.Poppler\n\n"
+                "Note: Make sure to restart your editor or terminal after it finishes installing!"
+            )
+        except Exception as e:
+            messagebox.showerror("PDF Error", f"Failed to extract pages from PDF:\n{str(e)}")
 
 if __name__ == "__main__":
     # Standard tk.Tk() initialization is replaced with the custom TkinterDnD context framework
