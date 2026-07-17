@@ -28,6 +28,7 @@ class ImageToPdfApp:
         # User-adjustable size parameters
         self.canvas_size = 350     # Height/width bounding square for canvas
         self.thumb_size = 70       # Height/width bounding square for thumbnails
+        self.zoom_scale = 1.0      # Current zoom factor for the main canvas image
 
         self.setup_ui()
         
@@ -97,6 +98,9 @@ class ImageToPdfApp:
         # Bind structural canvas scaling triggers to window size updates
         self.canvas.bind("<Configure>", self.respond_to_canvas_resize)
 
+        # Bind zoom triggers specifically when hovering over the canvas surface area
+        self.canvas.bind("<MouseWheel>", self.on_canvas_zoom)
+
         # Info line
         self.info_label = tk.Label(self.workspace, text="Press 'Delete' key or Right-Click a thumbnail to remove it.", font=("Arial", 9, "italic"), bg="#f5f5f5", fg="#777")
         self.info_label.grid(row=2, column=0, pady=2, sticky="ew")
@@ -126,7 +130,7 @@ class ImageToPdfApp:
         self.scrollbar.grid(row=1, column=0, sticky="ew")
 
         # Bind scroll wheel event tracking directly to the scroll viewport container frame
-        self.thumb_canvas.bind_all("<MouseWheel>", self.on_mousewheel)
+        self.thumb_canvas.bind("<MouseWheel>", self.on_mousewheel)
 
         # Init workspace strings
         self.canvas_text = None
@@ -200,6 +204,7 @@ class ImageToPdfApp:
 
         self.rebuild_single_thumbnail(idx)
         self.selected_index = idx
+        self.zoom_scale = 1.0 # Reset zoom level on a fresh addition
         self.update_main_canvas(pil_img)
         self.refresh_thumbnail_layout()
 
@@ -233,8 +238,16 @@ class ImageToPdfApp:
         max_w = min(cw, self.canvas_size * 1.5)
         max_h = min(ch, self.canvas_size)
 
+        # Apply the cumulative mouse zoom multiplier bounds factor
+        final_w = int(max_w * self.zoom_scale)
+        final_h = int(max_h * self.zoom_scale)
+
+        # Keep resolution bounded to avoid memory crashes on extreme zooms
+        final_w = max(min(final_w, 3000), 20)
+        final_h = max(min(final_h, 3000), 20)
+
         display_img = pil_img.copy()
-        display_img.thumbnail((max_w, max_h))
+        display_img.thumbnail((final_w, final_h))
         self.current_canvas_tk = ImageTk.PhotoImage(display_img)
         
         self.canvas.delete("all")
@@ -263,6 +276,7 @@ class ImageToPdfApp:
 
     def select_thumbnail(self, index):
         self.selected_index = index
+        self.zoom_scale = 1.0 # Reset zoom to baseline when swapping target selections
         self.update_main_canvas(self.image_list[index])
         self.refresh_thumbnail_layout()
         self.root.bind("<Delete>", lambda event: self.delete_thumbnail(self.selected_index))
@@ -317,6 +331,7 @@ class ImageToPdfApp:
                 self.draw_placeholder()
             else:
                 self.selected_index = len(self.image_list) - 1
+                self.zoom_scale = 1.0
                 self.update_main_canvas(self.image_list[self.selected_index])
 
             self.refresh_thumbnail_layout()
@@ -394,6 +409,23 @@ class ImageToPdfApp:
         """Decoupled helper to load standalone localized disk images directly into the runtime sequence."""
         file_img = Image.open(path)
         self.process_and_store_image(file_img)
+
+    def on_canvas_zoom(self, event):
+        """Calculates canvas dimensions when scroll event fires over main workbench."""
+        if not self.image_list or self.selected_index is None:
+            return
+
+        # Upward scroll increases scale factor, downward drops it
+        if event.delta > 0:
+            self.zoom_scale += 0.1
+        else:
+            self.zoom_scale -= 0.1
+
+        # Clip values to ensure safe display ranges (minimum 20% zoom, max 400%)
+        self.zoom_scale = max(min(self.zoom_scale, 4.0), 0.2)
+        
+        # Re-render the canvas visualization
+        self.update_main_canvas(self.image_list[self.selected_index])
 
 if __name__ == "__main__":
     # Standard tk.Tk() initialization is replaced with the custom TkinterDnD context framework
