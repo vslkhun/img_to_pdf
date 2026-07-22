@@ -1,14 +1,14 @@
 #app.py
 import os
 import tkinter as tk
-from tkinter import filedialog, messagebox
+from tkinter import filedialog #, messagebox
 
 from pdf2image import convert_from_path
 from pdf2image.exceptions import PDFInfoNotInstalledError
 from PIL import Image, ImageGrab, ImageTk
 from tkinterdnd2 import DND_FILES, TkinterDnD
 
-from theme import THEMES, RoundedButton, CustomScrollbar
+from theme import THEMES, CustomDialog, RoundedButton, CustomScrollbar, CustomDialog
 import ctypes
 
 def set_title_bar_mode(window, dark=True):
@@ -365,11 +365,13 @@ class ImageToPdfApp:
                         elif path.lower().endswith(".pdf"):
                             self.load_pdf_pages(path)
             else:
-                messagebox.showwarning(
-                    "Paste Failed", "No valid image or file path found in clipboard!"
-                )
+                # messagebox.showwarning(
+                #     "Paste Failed", "No valid image or file path found in clipboard!"
+                # )
+                self.show_warning("Paste Failed", "No valid image or file path found in clipboard!")
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to paste element: {str(e)}")
+            # messagebox.showerror("Error", f"Failed to paste element: {str(e)}")
+            self.show_error("Error", f"Failed to paste element:\n{str(e)}")
 
     def process_and_store_image(self, pil_img):
         if not self.image_list:
@@ -552,7 +554,8 @@ class ImageToPdfApp:
 
     def create_pdf(self):
         if not self.image_list:
-            messagebox.showwarning("Empty", "No images pasted yet to generate a PDF!")
+            # messagebox.showwarning("Empty", "No images pasted yet to generate a PDF!")
+            self.show_warning("Empty", "No images pasted yet to generate a PDF!")
             return
 
         file_path = filedialog.asksaveasfilename(
@@ -567,20 +570,23 @@ class ImageToPdfApp:
             first_image = self.image_list[0]
             subsequent_images = self.image_list[1:]
             first_image.save(file_path, save_all=True, append_images=subsequent_images)
-            messagebox.showinfo(
-                "Success",
-                f"PDF created successfully with {len(self.image_list)} images!",
-            )
+            # messagebox.showinfo(
+            #     "Success",
+            #     f"PDF created successfully with {len(self.image_list)} images!",
+            # )
+            self.show_info("Success", f"PDF created successfully with {len(self.image_list)} images!")
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to save PDF:\n{str(e)}")
+            # messagebox.showerror("Error", f"Failed to save PDF:\n{str(e)}")
+            self.show_error("Error", f"Failed to save PDF:\n{str(e)}")
 
     def reset_all(self):
         if not self.image_list:
             return
 
-        if messagebox.askyesno(
-            "Confirm Reset", "Are you sure you want to clear all images?"
-        ):
+        # if messagebox.askyesno(
+        #     "Confirm Reset", "Are you sure you want to clear all images?"
+        # ):
+        if self.ask_yes_no("Confirm Reset", "Are you sure you want to clear all images?"):
             self.image_list.clear()
             for data in self.thumb_data:
                 data["frame"].destroy()
@@ -640,9 +646,10 @@ class ImageToPdfApp:
                     print(f"Error parsing asset target payload: {e}")
 
         if not loaded_any:
-            messagebox.showwarning(
-                "Format Warning", "Dropped files must be valid image or PDF formats!"
-            )
+            # messagebox.showwarning(
+            #     "Format Warning", "Dropped files must be valid image or PDF formats!"
+            # )
+            self.show_warning("Format Warning", "Dropped files must be valid image or PDF formats!")
 
     def load_image_from_path(self, path):
         file_img = Image.open(path)
@@ -670,7 +677,14 @@ class ImageToPdfApp:
                 self.process_and_store_image(page)
 
         except PDFInfoNotInstalledError:
-            messagebox.showerror(
+            # messagebox.showerror(
+            #     "System Dependency Missing",
+            #     "Poppler is required to convert PDF files into images.\n\n"
+            #     "Please open your command prompt/terminal and execute:\n"
+            #     "winget install oschwartz10612.Poppler\n\n"
+            #     "Note: Make sure to restart your editor or terminal after it finishes installing!",
+            # )
+            self.show_error(
                 "System Dependency Missing",
                 "Poppler is required to convert PDF files into images.\n\n"
                 "Please open your command prompt/terminal and execute:\n"
@@ -678,11 +692,25 @@ class ImageToPdfApp:
                 "Note: Make sure to restart your editor or terminal after it finishes installing!",
             )
         except Exception as e:
-            messagebox.showerror(
+            # messagebox.showerror(
+            #     "PDF Error", f"Failed to extract pages from PDF:\n{str(e)}"
+            # )
+           self.show_error(
                 "PDF Error", f"Failed to extract pages from PDF:\n{str(e)}"
             )
 
+    def show_info(self, title, message):
+        CustomDialog(self.root, title, message, dialog_type="info", colors=self.colors, dark_title_bar_func=set_title_bar_mode)
 
+    def show_warning(self, title, message):
+        CustomDialog(self.root, title, message, dialog_type="warning", colors=self.colors, dark_title_bar_func=set_title_bar_mode)
+
+    def show_error(self, title, message):
+        CustomDialog(self.root, title, message, dialog_type="error", colors=self.colors, dark_title_bar_func=set_title_bar_mode)
+
+    def ask_yes_no(self, title, message):
+        dialog = CustomDialog(self.root, title, message, dialog_type="yesno", colors=self.colors, dark_title_bar_func=set_title_bar_mode)
+        return dialog.result
 if __name__ == "__main__":
     root = TkinterDnD.Tk()
     app = ImageToPdfApp(root)

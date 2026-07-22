@@ -49,8 +49,8 @@ class RoundedButton(tk.Canvas):
         text="",
         command=None,
         radius=8,
-        bg_color="#4CAF50",
-        hover_color="#45a049",
+        bg_color="#1D9E21",
+        hover_color="#10a018",
         text_color="#ffffff",
         font=("Arial", 10, "bold"),
         width=36,
@@ -210,3 +210,119 @@ class CustomScrollbar(tk.Canvas):
         self.configure(bg=track_color)
         self._draw()
 
+class CustomDialog(tk.Toplevel):
+    """A theme-aware replacement for tkinter.messagebox."""
+
+    def __init__(
+        self,
+        parent,
+        title,
+        message,
+        dialog_type="info",
+        colors=None,
+        dark_title_bar_func=None,
+    ):
+        super().__init__(parent)
+        self.result = False
+        self.colors = colors or THEMES["light"]
+
+        self.title(title)
+        self.resizable(False, False)
+        self.configure(bg=self.colors["bg"])
+
+        # Prevent modal window flickering while calculating geometry
+        self.withdraw()
+
+        # Update parent layout geometry math
+        parent.update_idletasks()
+
+        dialog_w, dialog_h = 380, 180
+        parent_x = parent.winfo_x()
+        parent_y = parent.winfo_y()
+        parent_w = parent.winfo_width()
+        parent_h = parent.winfo_height()
+
+        # Calculate exact center offset relative to the main app window
+        center_x = parent_x + (parent_w // 2) - (dialog_w // 2)
+        center_y = parent_y + (parent_h // 2) - (dialog_h // 2)
+
+        self.geometry(f"{dialog_w}x{dialog_h}+{center_x}+{center_y}")
+        self.deiconify()
+
+        # Focus modal binding
+        self.transient(parent)
+        self.grab_set()
+
+        # Apply dark title bar to popup if in dark mode
+        if dark_title_bar_func and self.colors["bg"] == "#1e1e1e":
+            dark_title_bar_func(self, dark=True)
+
+        # Message Text
+        lbl_msg = tk.Label(
+            self,
+            text=message,
+            font=("Arial", 10),
+            bg=self.colors["bg"],
+            fg=self.colors["text"],
+            wraplength=340,
+            justify="center",
+        )
+        lbl_msg.pack(expand=True, fill=tk.BOTH, padx=20, pady=(20, 10))
+
+        # Button Container
+        btn_frame = tk.Frame(self, bg=self.colors["bg"])
+        btn_frame.pack(fill=tk.X, pady=(0, 20))
+
+        if dialog_type == "yesno":
+            btn_yes = RoundedButton(
+                btn_frame,
+                text="Yes",
+                command=self._on_yes,
+                bg_color="#1D9E21",
+                hover_color="#10a018",
+                text_color="white",
+                radius=6,
+                width=80,
+                height=32,
+            )
+            btn_yes.pack(side=tk.RIGHT, padx=(5, 20))
+
+            btn_no = RoundedButton(
+                btn_frame,
+                text="No",
+                command=self._on_no,
+                bg_color="#9b2118",
+                hover_color="#b62f28",
+                text_color="white",
+                radius=6,
+                width=80,
+                height=32,
+            )
+            btn_no.pack(side=tk.RIGHT, padx=5)
+        else: # info, warning, error
+            btn_color = "#9b2118" if dialog_type == "error" else "#0078d7"
+            btn_hover = "#b62f28" if dialog_type == "error" else "#005a9e"
+
+            btn_ok = RoundedButton(
+                btn_frame,
+                text="OK",
+                command=self._on_yes,
+                bg_color=btn_color,
+                hover_color=btn_hover,
+                text_color="white",
+                radius=6,
+                width=90,
+                height=32,
+            )
+            # btn_ok.pack(side=tk.CENTER)
+            btn_ok.pack(anchor="center")
+
+        self.wait_window()
+
+    def _on_yes(self):
+        self.result = True
+        self.destroy()
+
+    def _on_no(self):
+        self.result = False
+        self.destroy()
