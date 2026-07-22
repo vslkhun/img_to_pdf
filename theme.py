@@ -1,6 +1,7 @@
 #theme.py
 import tkinter as tk
-
+import ctypes
+import sys
 # Application Theme Color Palettes
 THEMES = {
     "light": {
@@ -80,7 +81,30 @@ LAYOUT = {
     "btn_create_bg": "#1D9E21",
     "btn_create_hover": "#10a018",
 }
+# def set_title_bar_mode(window, dark=True):
+#     try:
+#         window.update()
+#         hwnd = ctypes.windll.user32.GetParent(window.winfo_id())
+#         value = ctypes.c_int(1 if dark else 0)
+#         for attr in (20, 19):
+#             ctypes.windll.dwmapi.DwmSetWindowAttribute(
+#                 hwnd, attr, ctypes.byref(value), ctypes.sizeof(value)
+#             )
+#     except Exception:
+#         pass
+def set_title_bar_mode(window, dark=True):
+    # DWM attributes are Windows-only
+    if sys.platform != "win32":
+        return
 
+    try:
+        window.update()
+        hwnd = ctypes.windll.user32.GetParent(window.winfo_id())
+        value = ctypes.c_int(2 if dark else 0)
+        # 20 is DWMWA_USE_IMMERSIVE_DARK_MODE
+        ctypes.windll.dwmapi.DwmSetWindowAttribute(hwnd, 20, ctypes.byref(value), ctypes.sizeof(value))
+    except Exception as e:
+        print(f"Title bar theme change failed: {e}")
 class RoundedButton(tk.Canvas):
     """Custom Canvas-drawn Button with rounded corners and smooth hover states."""
 

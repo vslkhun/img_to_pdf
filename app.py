@@ -1,6 +1,6 @@
 # app.py
-import ctypes
 import os
+import sys
 import tkinter as tk
 from tkinter import filedialog
 
@@ -9,21 +9,8 @@ from pdf2image.exceptions import PDFInfoNotInstalledError
 from PIL import Image, ImageGrab, ImageTk
 from tkinterdnd2 import DND_FILES, TkinterDnD
 
-from theme import LAYOUT, THEMES, CustomDialog, CustomScrollbar, RoundedButton
+from theme import LAYOUT, THEMES, CustomDialog, CustomScrollbar, RoundedButton, set_title_bar_mode
 import webbrowser
-
-def set_title_bar_mode(window, dark=True):
-    try:
-        window.update()
-        hwnd = ctypes.windll.user32.GetParent(window.winfo_id())
-        value = ctypes.c_int(1 if dark else 0)
-        for attr in (20, 19):
-            ctypes.windll.dwmapi.DwmSetWindowAttribute(
-                hwnd, attr, ctypes.byref(value), ctypes.sizeof(value)
-            )
-    except Exception:
-        pass
-
 
 class ImageToPdfApp:
     def __init__(self, root):
@@ -66,11 +53,17 @@ class ImageToPdfApp:
         self.root.drop_target_register(DND_FILES)
         self.root.dnd_bind("<<Drop>>", self.handle_drop)
 
-        # Bind Ctrl+Z
-        self.root.bind("<Control-z>", self.handle_undo)
-        self.root.bind("<Control-Z>", self.handle_undo)
-        self.root.bind("<Control-v>", self.handle_paste)
-        self.root.bind("<Control-V>", self.handle_paste)
+        # Determine modifier key based on OS
+        mod = "Command" if sys.platform == "darwin" else "Control"
+
+        # Undo shortcuts
+        self.root.bind(f"<{mod}-z>", self.handle_undo)
+        self.root.bind(f"<{mod}-Z>", self.handle_undo)
+
+        # Paste shortcuts
+        self.root.bind(f"<{mod}-v>", self.handle_paste)
+        self.root.bind(f"<{mod}-V>", self.handle_paste)
+
 
     def setup_ui(self):
         # Workspace Container
@@ -100,7 +93,7 @@ class ImageToPdfApp:
         self.canvas.grid(row=1, column=0, sticky="nsew", pady=5)
         self.canvas.bind("<Button-1>", lambda e: self.canvas.focus_set())
         self.canvas.bind("<Configure>", self.respond_to_canvas_resize)
-        self.canvas.bind("<MouseWheel>", self.on_canvas_zoom)
+        # self.canvas.bind("<MouseWheel>", self.on_canvas_zoom)
 
         self.info_label = tk.Label(
             self.workspace,
@@ -292,6 +285,15 @@ class ImageToPdfApp:
         # Bind Canvas Panning (Click & Drag to move zoomed image)
         self.canvas.bind("<ButtonPress-1>", self.on_pan_start)
         self.canvas.bind("<B1-Motion>", self.on_panning)
+        # Mouse Wheel / Zoom Bindings
+        if sys.platform == "linux":
+            self.canvas.bind("<Button-4>", lambda e: self.on_canvas_zoom(e, delta=120))
+            self.canvas.bind("<Button-5>", lambda e: self.on_canvas_zoom(e, delta=-120))
+            self.thumb_canvas.bind("<Button-4>", lambda e: self.on_tray_scroll(e, delta=-1))
+            self.thumb_canvas.bind("<Button-5>", lambda e: self.on_tray_scroll(e, delta=1))
+        else:
+            self.canvas.bind("<MouseWheel>", self.on_canvas_zoom)
+            self.thumb_canvas.bind("<MouseWheel>", self.on_tray_scroll)
 
     def toggle_theme(self):
         self.current_mode = "dark" if self.current_mode == "light" else "light"
@@ -581,37 +583,6 @@ class ImageToPdfApp:
     def on_drag_start(self, index):
         self.dragged_index = index
 
-    # def on_dragging(self, event, index):
-    #     if self.dragged_index is None:
-    #         return
-
-    #     widget = event.widget
-    #     if isinstance(widget, str):
-    #         widget = self.root.nametowidget(widget)
-
-    #     x_on_inner_frame = event.x + widget.winfo_x() + widget.master.winfo_x()
-
-    #     for target_idx, data in enumerate(self.thumb_data):
-    #         child = data["frame"]
-    #         child_x = child.winfo_x()
-    #         child_width = child.winfo_width()
-
-    #         if child_x <= x_on_inner_frame <= (child_x + child_width):
-    #             if target_idx != self.dragged_index:
-    #                 img = self.image_list.pop(self.dragged_index)
-    #                 self.image_list.insert(target_idx, img)
-
-    #                 frame_data = self.thumb_data.pop(self.dragged_index)
-    #                 self.thumb_data.insert(target_idx, frame_data)
-
-    #                 if self.selected_index == self.dragged_index:
-    #                     self.selected_index = target_idx
-    #                 elif self.selected_index == target_idx:
-    #                     self.selected_index = self.dragged_index
-
-    #                 self.dragged_index = target_idx
-    #                 self.refresh_thumbnail_layout()
-    #             break
     def on_dragging(self, event, index):
         if self.dragged_index is None:
             return
@@ -774,21 +745,26 @@ class ImageToPdfApp:
         file_img = Image.open(path)
         self.process_and_store_image(file_img, save_undo=save_undo)
 
-    def on_canvas_zoom(self, event):
-        if not self.image_list or self.selected_index is None:
-            return
+    def on_canvas_zoom(self, event, delta=None):
+        if delta is None:
+            delta = event.delta
+            if sys.platform == "darwin":  # macOS inverted delta
+                delta = -delta
 
-        if event.delta > 0:
-            self.zoom_scale += 0.1
+        if delta > 0:
+            self.zoom_scale *= 1.1
         else:
-            self.zoom_scale -= 0.1
+            self.zoom_scale /= 1.1
 
-        self.zoom_scale = max(min(self.zoom_scale, 4.0), 0.2)
-        self.update_main_canvas(self.image_list[self.selected_index])
+        if self.selected_index is not None and self.image_list:
+            self.update_main_canvas(self.image_list[self.selected_index])
 
     def load_pdf_pages(self, path, save_undo=True):
         try:
-            pages = convert_from_path(path)
+            # pages = convert_from_path(path)
+            POPPELER_PATH = None
+            p_path = POPPELER_PATH if sys.platform == "win32" else None
+            pages = convert_from_path(path, poppler_path=p_path)
             if not pages:
                 return
 
@@ -799,11 +775,17 @@ class ImageToPdfApp:
                 self.process_and_store_image(page, save_undo=False)
 
         except PDFInfoNotInstalledError:
+            if sys.platform == "win32":
+                m="winget install oschwartz10612.Poppler"
+            elif sys.platform == "darwin":
+                m="brew install poppler"
+            elif sys.platform.startswith("linux"):
+                m="sudo apt install poppler-utils"  
             self.show_error(
                 "System Dependency Missing",
                 "Poppler is required to convert PDF files into images.\n\n"
                 "Please open your command prompt/terminal and execute:\n"
-                "winget install oschwartz10612.Poppler\n\n"
+                f"{m}\n\n"
                 "Note: Make sure to restart your editor or terminal after it finishes installing!",
             )
         except Exception as e:
@@ -981,6 +963,14 @@ class ImageToPdfApp:
             self.root.after_cancel(self.auto_scroll_job)
             self.auto_scroll_job = None
         self.auto_scroll_speed = 0
+ 
+    def on_tray_scroll(self, event, delta=None):
+        if delta is None:
+            delta = -1 if event.delta > 0 else 1
+            if sys.platform == "darwin":
+                delta = -delta
+
+        self.thumb_canvas.xview_scroll(delta, "units")
 if __name__ == "__main__":
     root = TkinterDnD.Tk()
     app = ImageToPdfApp(root)
