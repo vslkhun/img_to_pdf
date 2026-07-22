@@ -81,17 +81,7 @@ LAYOUT = {
     "btn_create_bg": "#1D9E21",
     "btn_create_hover": "#10a018",
 }
-# def set_title_bar_mode(window, dark=True):
-#     try:
-#         window.update()
-#         hwnd = ctypes.windll.user32.GetParent(window.winfo_id())
-#         value = ctypes.c_int(1 if dark else 0)
-#         for attr in (20, 19):
-#             ctypes.windll.dwmapi.DwmSetWindowAttribute(
-#                 hwnd, attr, ctypes.byref(value), ctypes.sizeof(value)
-#             )
-#     except Exception:
-#         pass
+
 def set_title_bar_mode(window, dark=True):
     # DWM attributes are Windows-only
     if sys.platform != "win32":
