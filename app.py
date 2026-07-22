@@ -54,6 +54,10 @@ class ImageToPdfApp:
         self.thumb_size = LAYOUT["default_thumb_size"]
         self.zoom_scale = 1.0
 
+        # Auto-scroll on drag state
+        self.auto_scroll_job = None
+        self.auto_scroll_speed = 0
+
         self.setup_ui()
 
         self.root.bind("<Control-v>", self.handle_paste)
@@ -560,6 +564,7 @@ class ImageToPdfApp:
                     add="+",
                 )
                 w.bind("<B1-Motion>", lambda e, index=idx: self.on_dragging(e, index))
+                w.bind("<ButtonRelease-1>", self.on_drag_end, add="+")
 
         self.thumb_canvas.update_idletasks()
         self.thumb_canvas.configure(scrollregion=self.thumb_canvas.bbox("all"))
@@ -576,9 +581,43 @@ class ImageToPdfApp:
     def on_drag_start(self, index):
         self.dragged_index = index
 
+    # def on_dragging(self, event, index):
+    #     if self.dragged_index is None:
+    #         return
+
+    #     widget = event.widget
+    #     if isinstance(widget, str):
+    #         widget = self.root.nametowidget(widget)
+
+    #     x_on_inner_frame = event.x + widget.winfo_x() + widget.master.winfo_x()
+
+    #     for target_idx, data in enumerate(self.thumb_data):
+    #         child = data["frame"]
+    #         child_x = child.winfo_x()
+    #         child_width = child.winfo_width()
+
+    #         if child_x <= x_on_inner_frame <= (child_x + child_width):
+    #             if target_idx != self.dragged_index:
+    #                 img = self.image_list.pop(self.dragged_index)
+    #                 self.image_list.insert(target_idx, img)
+
+    #                 frame_data = self.thumb_data.pop(self.dragged_index)
+    #                 self.thumb_data.insert(target_idx, frame_data)
+
+    #                 if self.selected_index == self.dragged_index:
+    #                     self.selected_index = target_idx
+    #                 elif self.selected_index == target_idx:
+    #                     self.selected_index = self.dragged_index
+
+    #                 self.dragged_index = target_idx
+    #                 self.refresh_thumbnail_layout()
+    #             break
     def on_dragging(self, event, index):
         if self.dragged_index is None:
             return
+
+        # Check if dragging near tray edges to scroll automatically
+        self.check_auto_scroll(event)
 
         widget = event.widget
         if isinstance(widget, str):
@@ -607,6 +646,11 @@ class ImageToPdfApp:
                     self.dragged_index = target_idx
                     self.refresh_thumbnail_layout()
                 break
+
+    def on_drag_end(self, event=None):
+        """Cleans up drag state and halts auto-scroll when mouse button is released."""
+        self.dragged_index = None
+        self.stop_auto_scroll()
 
     def delete_thumbnail(self, index):
         if index is not None and 0 <= index < len(self.image_list):
@@ -901,6 +945,42 @@ class ImageToPdfApp:
         self.zoom_scale = 1.0
         self.update_main_canvas(self.image_list[self.selected_index])
         self.refresh_thumbnail_layout()
+    def check_auto_scroll(self, event):
+        """Checks if mouse is near left/right edge during drag and starts auto-scrolling."""
+        # Get canvas bounds on screen
+        canvas_x = self.thumb_canvas.winfo_rootx()
+        canvas_w = self.thumb_canvas.winfo_width()
+        mouse_x = event.x_root
+
+        edge_margin = 40  # Distance in pixels from edge to trigger scrolling
+
+        if mouse_x < (canvas_x + edge_margin):
+            # Near left edge -> scroll left
+            self.auto_scroll_speed = -1
+            if self.auto_scroll_job is None:
+                self.run_auto_scroll()
+        elif mouse_x > (canvas_x + canvas_w - edge_margin):
+            # Near right edge -> scroll right
+            self.auto_scroll_speed = 1
+            if self.auto_scroll_job is None:
+                self.run_auto_scroll()
+        else:
+            # Not near any edge -> stop scrolling
+            self.stop_auto_scroll()
+
+    def run_auto_scroll(self):
+        """Continuously scrolls the thumbnail tray while holding near edge."""
+        if self.auto_scroll_speed != 0:
+            self.thumb_canvas.xview_scroll(self.auto_scroll_speed, "units")
+            # Repeat every 30ms (~33 FPS) for smooth scrolling
+            self.auto_scroll_job = self.root.after(30, self.run_auto_scroll)
+
+    def stop_auto_scroll(self):
+        """Stops the active auto-scroll loop."""
+        if self.auto_scroll_job is not None:
+            self.root.after_cancel(self.auto_scroll_job)
+            self.auto_scroll_job = None
+        self.auto_scroll_speed = 0
 if __name__ == "__main__":
     root = TkinterDnD.Tk()
     app = ImageToPdfApp(root)
