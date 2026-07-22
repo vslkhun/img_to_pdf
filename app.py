@@ -33,8 +33,11 @@ class ImageToPdfApp:
         min_w, min_h = LAYOUT["min_window_size"]
         self.root.minsize(min_w, min_h)
 
-        self.current_mode = "light"
+        self.current_mode = "dark"
         self.colors = THEMES[self.current_mode]
+        # Apply dark title bar if starting in dark mode
+        if self.current_mode == "dark":
+            set_title_bar_mode(self.root, dark=True)
 
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
@@ -43,6 +46,9 @@ class ImageToPdfApp:
         self.thumb_data = []
         self.selected_index = None
         self.dragged_index = None
+
+        # History stack for Ctrl+Z undo support
+        self.history_stack = []
 
         self.canvas_size = LAYOUT["default_canvas_size"]
         self.thumb_size = LAYOUT["default_thumb_size"]
@@ -55,6 +61,12 @@ class ImageToPdfApp:
 
         self.root.drop_target_register(DND_FILES)
         self.root.dnd_bind("<<Drop>>", self.handle_drop)
+
+        # Bind Ctrl+Z
+        self.root.bind("<Control-z>", self.handle_undo)
+        self.root.bind("<Control-Z>", self.handle_undo)
+        self.root.bind("<Control-v>", self.handle_paste)
+        self.root.bind("<Control-V>", self.handle_paste)
 
     def setup_ui(self):
         # Workspace Container
@@ -167,7 +179,7 @@ class ImageToPdfApp:
         # Open link on click
         self.lbl_footer.bind(
             "<Button-1>",
-            lambda e: webbrowser.open_new(LAYOUT["footer_text"]["url"]),
+            lambda e: webbrowser.open_new(LAYOUT["footer_link"]["url"]),
         )
         # Canvas Preview Size Control
         self.lbl_canvas_icon = tk.Label(
@@ -381,33 +393,43 @@ class ImageToPdfApp:
         try:
             img = ImageGrab.grabclipboard()
             if isinstance(img, Image.Image):
-                self.process_and_store_image(img)
+                self.process_and_store_image(img, save_undo=True)
             elif isinstance(img, list):
+                # Save snapshot ONCE before the batch loop starts
+                self.save_snapshot()
                 for path in img:
                     if os.path.isfile(path):
                         if path.lower().endswith(
                             (".png", ".jpg", ".jpeg", ".bmp", ".gif")
                         ):
-                            self.process_and_store_image(Image.open(path))
+                            self.process_and_store_image(Image.open(path), save_undo=False)
                         elif path.lower().endswith(".pdf"):
-                            self.load_pdf_pages(path)
+                            self.load_pdf_pages(path, save_undo=False)
             else:
                 self.show_warning(
                     "Paste Failed", "No valid image or file path found in clipboard!"
                 )
         except Exception as e:
             self.show_error("Error", f"Failed to paste element:\n{str(e)}")
+    
+    def process_and_store_image(self, pil_img, save_undo=True):
+        if save_undo:
+            self.save_snapshot()
 
-    def process_and_store_image(self, pil_img):
         if not self.image_list:
             self.canvas.delete(self.canvas_text)
 
         if pil_img.mode in ("RGBA", "P"):
             pil_img = pil_img.convert("RGB")
 
-        self.image_list.append(pil_img)
+        # Insert after currently selected thumbnail, or at end if nothing selected
+        if self.selected_index is not None and 0 <= self.selected_index < len(self.image_list):
+            insert_idx = self.selected_index + 1
+        else:
+            insert_idx = len(self.image_list)
 
-        idx = len(self.image_list) - 1
+        self.image_list.insert(insert_idx, pil_img)
+
         item_frame = tk.Frame(
             self.thumb_inner_frame,
             bg=self.colors["tray_bg"],
@@ -425,17 +447,18 @@ class ImageToPdfApp:
         )
         lbl_num.pack()
 
-        self.thumb_data.append(
+        self.thumb_data.insert(
+            insert_idx,
             {
                 "frame": item_frame,
                 "lbl_img": lbl_img,
                 "lbl_num": lbl_num,
                 "tk_thumb": None,
-            }
+            },
         )
 
-        self.rebuild_single_thumbnail(idx)
-        self.selected_index = idx
+        self.rebuild_single_thumbnail(insert_idx)
+        self.selected_index = insert_idx
         self.zoom_scale = 1.0
         self.update_main_canvas(pil_img)
         self.refresh_thumbnail_layout()
@@ -669,37 +692,43 @@ class ImageToPdfApp:
             paths = [p.strip() for p in raw_data.split() if p.strip()]
 
         valid_extensions = (
-            ".png",
-            ".jpg",
-            ".jpeg",
-            ".bmp",
-            ".gif",
-            ".webp",
-            ".tiff",
-            ".pdf",
-        )
-        loaded_any = False
+                            ".png",
+                            ".jpg",
+                            ".jpeg",
+                            ".bmp",
+                            ".gif",
+                            ".webp",
+                            ".tiff",
+                            ".pdf"
+            )
+        
+        # Filter valid files
+        valid_paths = [
+            p.strip('"').strip("'") for p in paths 
+            if os.path.isfile(p.strip('"').strip("'")) and p.strip('"').strip("'").lower().endswith(valid_extensions)
+        ]
 
-        for path in paths:
-            path = path.strip('"').strip("'")
-            if os.path.isfile(path) and path.lower().endswith(valid_extensions):
-                try:
-                    if path.lower().endswith(".pdf"):
-                        self.load_pdf_pages(path)
-                    else:
-                        self.load_image_from_path(path)
-                    loaded_any = True
-                except Exception as e:
-                    print(f"Error parsing asset target payload: {e}")
-
-        if not loaded_any:
+        if not valid_paths:
             self.show_warning(
                 "Format Warning", "Dropped files must be valid image or PDF formats!"
             )
+            return
 
-    def load_image_from_path(self, path):
+        # Save snapshot ONCE before importing the batch
+        self.save_snapshot()
+
+        for path in valid_paths:
+            try:
+                if path.lower().endswith(".pdf"):
+                    self.load_pdf_pages(path, save_undo=False)
+                else:
+                    self.load_image_from_path(path, save_undo=False)
+            except Exception as e:
+                print(f"Error parsing asset target payload: {e}")
+
+    def load_image_from_path(self, path, save_undo=True):
         file_img = Image.open(path)
-        self.process_and_store_image(file_img)
+        self.process_and_store_image(file_img, save_undo=save_undo)
 
     def on_canvas_zoom(self, event):
         if not self.image_list or self.selected_index is None:
@@ -713,14 +742,17 @@ class ImageToPdfApp:
         self.zoom_scale = max(min(self.zoom_scale, 4.0), 0.2)
         self.update_main_canvas(self.image_list[self.selected_index])
 
-    def load_pdf_pages(self, path):
+    def load_pdf_pages(self, path, save_undo=True):
         try:
             pages = convert_from_path(path)
             if not pages:
                 return
 
+            if save_undo:
+                self.save_snapshot()
+
             for page in pages:
-                self.process_and_store_image(page)
+                self.process_and_store_image(page, save_undo=False)
 
         except PDFInfoNotInstalledError:
             self.show_error(
@@ -796,6 +828,79 @@ class ImageToPdfApp:
         # Update reference points
         self.pan_start_x = event.x
         self.pan_start_y = event.y
+    def save_snapshot(self):
+        """Saves a shallow copy state of image_list and selected_index before modification."""
+        snapshot = {
+            "image_list": list(self.image_list),
+            "selected_index": self.selected_index,
+        }
+        self.history_stack.append(snapshot)
+        # Limit stack depth to prevent excessive memory usage
+        if len(self.history_stack) > 30:
+            self.history_stack.pop(0)
+
+    def handle_undo(self, event=None):
+        """Restores the previous state on Ctrl+Z."""
+        if not self.history_stack:
+            return
+
+        last_state = self.history_stack.pop()
+        self.image_list = last_state["image_list"]
+        self.selected_index = last_state["selected_index"]
+
+        # Rebuild UI widgets based on restored image_list
+        self.rebuild_full_ui_from_list()
+
+    def rebuild_full_ui_from_list(self):
+        """Completely rebuilds thumbnail widgets and main canvas after undo."""
+        for data in self.thumb_data:
+            data["frame"].destroy()
+        self.thumb_data.clear()
+
+        if not self.image_list:
+            self.selected_index = None
+            self.root.unbind("<Delete>")
+            self.draw_placeholder()
+            self.refresh_thumbnail_layout()
+            return
+
+        # Re-create thumbnail widget frames
+        for idx in range(len(self.image_list)):
+            item_frame = tk.Frame(
+                self.thumb_inner_frame,
+                bg=self.colors["tray_bg"],
+                bd=2,
+                relief=tk.FLAT,
+            )
+            lbl_img = tk.Label(item_frame, bg="white")
+            lbl_img.pack()
+            lbl_num = tk.Label(
+                item_frame,
+                text="",
+                font=LAYOUT["font_thumb_num"],
+                bg=self.colors["tray_bg"],
+                fg=self.colors["card_text"],
+            )
+            lbl_num.pack()
+
+            self.thumb_data.append(
+                {
+                    "frame": item_frame,
+                    "lbl_img": lbl_img,
+                    "lbl_num": lbl_num,
+                    "tk_thumb": None,
+                }
+            )
+
+        self.rebuild_thumbnails_cache()
+
+        # Adjust selected index bound safety
+        if self.selected_index is None or self.selected_index >= len(self.image_list):
+            self.selected_index = len(self.image_list) - 1
+
+        self.zoom_scale = 1.0
+        self.update_main_canvas(self.image_list[self.selected_index])
+        self.refresh_thumbnail_layout()
 if __name__ == "__main__":
     root = TkinterDnD.Tk()
     app = ImageToPdfApp(root)

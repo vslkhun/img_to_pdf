@@ -73,7 +73,7 @@ LAYOUT = {
     "btn_dialog_ok_size": {"width": 90, "height": 32, "radius": 6},
     # Footer
     "footer_text": {"text": "© 2026 Image to PDF  •  Developed with ❤️ by Veeshel Khundrakpam"},
-    "footer_link": "https://github.com/vslkhun",
+    "footer_link": {"url": "https://github.com/vslkhun"},
     # Colors independent of light/dark themes
     "btn_reset_bg": "#9b2118",
     "btn_reset_hover": "#b62f28",
