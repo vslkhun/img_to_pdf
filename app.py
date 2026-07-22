@@ -1,15 +1,16 @@
-#app.py
+# app.py
+import ctypes
 import os
 import tkinter as tk
-from tkinter import filedialog #, messagebox
+from tkinter import filedialog
 
 from pdf2image import convert_from_path
 from pdf2image.exceptions import PDFInfoNotInstalledError
 from PIL import Image, ImageGrab, ImageTk
 from tkinterdnd2 import DND_FILES, TkinterDnD
 
-from theme import THEMES, CustomDialog, RoundedButton, CustomScrollbar, CustomDialog
-import ctypes
+from theme import LAYOUT, THEMES, CustomDialog, CustomScrollbar, RoundedButton
+import webbrowser
 
 def set_title_bar_mode(window, dark=True):
     try:
@@ -23,12 +24,14 @@ def set_title_bar_mode(window, dark=True):
     except Exception:
         pass
 
+
 class ImageToPdfApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Image to PDF Creator")
-        self.root.geometry("950x700")
-        self.root.minsize(700, 500)
+        self.root.title(LAYOUT["app_title"])
+        self.root.geometry(LAYOUT["window_size"])
+        min_w, min_h = LAYOUT["min_window_size"]
+        self.root.minsize(min_w, min_h)
 
         self.current_mode = "light"
         self.colors = THEMES[self.current_mode]
@@ -41,8 +44,8 @@ class ImageToPdfApp:
         self.selected_index = None
         self.dragged_index = None
 
-        self.canvas_size = 350
-        self.thumb_size = 70
+        self.canvas_size = LAYOUT["default_canvas_size"]
+        self.thumb_size = LAYOUT["default_thumb_size"]
         self.zoom_scale = 1.0
 
         self.setup_ui()
@@ -63,7 +66,7 @@ class ImageToPdfApp:
         self.instruction_label = tk.Label(
             self.workspace,
             text="Drop Image/PDF / Ctrl+V to Paste | Click thumbnail to view | Drag thumbnails to reorder",
-            font=("Arial", 11),
+            font=LAYOUT["font_instruction"],
             bg=self.colors["bg"],
             fg=self.colors["subtext"],
         )
@@ -84,7 +87,7 @@ class ImageToPdfApp:
         self.info_label = tk.Label(
             self.workspace,
             text="Press 'Delete' key or Right-Click a thumbnail to remove it.",
-            font=("Arial", 9, "italic"),
+            font=LAYOUT["font_info"],
             bg=self.colors["bg"],
             fg=self.colors["subtext"],
         )
@@ -94,7 +97,7 @@ class ImageToPdfApp:
         self.thumb_outer_frame = tk.Frame(
             self.workspace,
             bg=self.colors["tray_bg"],
-            height=150,
+            height=LAYOUT["thumb_tray_height"],
             bd=1,
             relief=tk.SUNKEN,
         )
@@ -113,7 +116,7 @@ class ImageToPdfApp:
             command=self.thumb_canvas.xview,
             track_color=self.colors["scrollbar_track"],
             thumb_color=self.colors["scrollbar_thumb"],
-            height=10,
+            height=LAYOUT["scrollbar_height"],
         )
         self.thumb_inner_frame = tk.Frame(
             self.thumb_canvas, bg=self.colors["tray_bg"]
@@ -140,9 +143,7 @@ class ImageToPdfApp:
         self.thumb_canvas.bind("<MouseWheel>", self.on_mousewheel)
         self.thumb_outer_frame.bind("<MouseWheel>", self.on_mousewheel)
 
-        # =====================================================================
-        # BOTTOM CONTROL TOOLBAR (Comfortable / Larger Sizing)
-        # =====================================================================
+        # Bottom Control Toolbar
         self.toolbar = tk.Frame(
             self.workspace,
             bg=self.colors["toolbar_bg"],
@@ -152,29 +153,43 @@ class ImageToPdfApp:
             pady=8,
         )
         self.toolbar.grid(row=4, column=0, sticky="ew", pady=(5, 0))
-
+        # Footer Label
+        self.lbl_footer = tk.Label(
+            self.workspace,
+            text=LAYOUT["footer_text"]["text"],
+            font=LAYOUT["font_footer"],
+            bg=self.colors["bg"],
+            fg=self.colors["subtext"],
+        )
+        self.lbl_footer.grid(row=5, column=0, pady=(6, 0), sticky="ew")
+        # Open link on click
+        self.lbl_footer.bind(
+            "<Button-1>",
+            lambda e: webbrowser.open_new(LAYOUT["footer_text"]["url"]),
+        )
         # Canvas Preview Size Control
         self.lbl_canvas_icon = tk.Label(
             self.toolbar,
             text="🖼️ Canvas",
-            font=("Arial", 10, "bold"),
+            font=LAYOUT["font_bold"],
             bg=self.colors["toolbar_bg"],
             fg=self.colors["text"],
         )
         self.lbl_canvas_icon.pack(side=tk.LEFT, padx=(5, 5))
 
+        c_min, c_max = LAYOUT["slider_canvas_range"]
         self.canvas_slider = tk.Scale(
             self.toolbar,
-            from_=200,
-            to=600,
+            from_=c_min,
+            to=c_max,
             orient=tk.HORIZONTAL,
-            length=140,  # Increased slider length
+            length=LAYOUT["slider_length"],
             showvalue=False,
             bg=self.colors["toolbar_bg"],
             fg=self.colors["text"],
             highlightthickness=0,
             bd=0,
-            width=12,  # Thicker slider track
+            width=LAYOUT["slider_width"],
         )
         self.canvas_slider.set(self.canvas_size)
         self.canvas_slider.pack(side=tk.LEFT, padx=(0, 20))
@@ -184,58 +199,62 @@ class ImageToPdfApp:
         self.lbl_thumb_icon = tk.Label(
             self.toolbar,
             text="🔍 Thumbs",
-            font=("Arial", 10, "bold"),
+            font=LAYOUT["font_bold"],
             bg=self.colors["toolbar_bg"],
             fg=self.colors["text"],
         )
         self.lbl_thumb_icon.pack(side=tk.LEFT, padx=(5, 5))
 
+        t_min, t_max = LAYOUT["slider_thumb_range"]
         self.thumb_slider = tk.Scale(
             self.toolbar,
-            from_=40,
-            to=120,
+            from_=t_min,
+            to=t_max,
             orient=tk.HORIZONTAL,
-            length=140,  # Increased slider length
+            length=LAYOUT["slider_length"],
             showvalue=False,
             bg=self.colors["toolbar_bg"],
             fg=self.colors["text"],
             highlightthickness=0,
             bd=0,
-            width=12,  # Thicker slider track
+            width=LAYOUT["slider_width"],
         )
         self.thumb_slider.set(self.thumb_size)
         self.thumb_slider.pack(side=tk.LEFT, padx=(0, 20))
         self.thumb_slider.bind("<ButtonRelease-1>", self.on_layout_slider_change)
 
-        # Right-aligned Larger Action Buttons
+        # Action Buttons
+        reset_cfg = LAYOUT["btn_reset_size"]
         self.btn_reset = RoundedButton(
             self.toolbar,
             text="🗑️ Reset",
             command=self.reset_all,
-            bg_color="#9b2118",
-            hover_color="#b62f28",
+            bg_color=LAYOUT["btn_reset_bg"],
+            hover_color=LAYOUT["btn_reset_hover"],
             text_color="white",
-            radius=8,
-            width=90,
-            height=36,
-            font=("Arial", 10, "bold"),
+            radius=reset_cfg["radius"],
+            width=reset_cfg["width"],
+            height=reset_cfg["height"],
+            font=LAYOUT["font_bold"],
         )
         self.btn_reset.pack(side=tk.RIGHT, padx=6)
 
+        create_cfg = LAYOUT["btn_create_size"]
         self.btn_create = RoundedButton(
             self.toolbar,
             text="📄 Create PDF",
             command=self.create_pdf,
-            bg_color="#1D9E21",
-            hover_color="#10a018",
+            bg_color=LAYOUT["btn_create_bg"],
+            hover_color=LAYOUT["btn_create_hover"],
             text_color="white",
-            radius=8,
-            width=110,
-            height=36,
-            font=("Arial", 10, "bold"),
+            radius=create_cfg["radius"],
+            width=create_cfg["width"],
+            height=create_cfg["height"],
+            font=LAYOUT["font_bold"],
         )
         self.btn_create.pack(side=tk.RIGHT, padx=6)
 
+        theme_cfg = LAYOUT["btn_theme_size"]
         self.btn_theme = RoundedButton(
             self.toolbar,
             text="🌙 Theme",
@@ -243,14 +262,14 @@ class ImageToPdfApp:
             bg_color=self.colors["btn_theme_bg"],
             hover_color=self.colors["btn_theme_hover"],
             text_color=self.colors["btn_theme_fg"],
-            radius=8,
-            width=85,
-            height=36,
-            font=("Arial", 10, "bold"),
+            radius=theme_cfg["radius"],
+            width=theme_cfg["width"],
+            height=theme_cfg["height"],
+            font=LAYOUT["font_bold"],
         )
         self.btn_theme.pack(side=tk.RIGHT, padx=6)
 
-        self.canvas_text = '' #None
+        self.canvas_text = ""
         self.draw_placeholder()
 
     def toggle_theme(self):
@@ -269,7 +288,6 @@ class ImageToPdfApp:
         self.btn_create.update_colors(parent_bg=self.colors["toolbar_bg"])
         self.btn_reset.update_colors(parent_bg=self.colors["toolbar_bg"])
 
-        # Update Custom Scrollbar Theme Colors
         self.scrollbar.update_colors(
             track_color=self.colors["scrollbar_track"],
             thumb_color=self.colors["scrollbar_thumb"],
@@ -285,6 +303,10 @@ class ImageToPdfApp:
         self.lbl_thumb_icon.config(
             bg=self.colors["toolbar_bg"], fg=self.colors["text"]
         )
+
+        self.lbl_footer.config(
+            bg=self.colors["bg"], fg=self.colors["subtext"]
+            )
 
         self.canvas_slider.config(
             bg=self.colors["toolbar_bg"], fg=self.colors["text"]
@@ -309,7 +331,7 @@ class ImageToPdfApp:
             self.draw_placeholder()
         self.refresh_thumbnail_layout()
         set_title_bar_mode(self.root, dark=(self.current_mode == "dark"))
-        
+
     def draw_placeholder(self):
         if not self.image_list:
             self.canvas.delete("all")
@@ -331,7 +353,7 @@ class ImageToPdfApp:
                 h // 2,
                 text="[ Drop Image/PDF or Paste Here ]",
                 fill=placeholder_color,
-                font=("Arial", 14, "italic"),
+                font=LAYOUT["font_placeholder"],
             )
 
     def on_layout_slider_change(self, event=None):
@@ -365,12 +387,10 @@ class ImageToPdfApp:
                         elif path.lower().endswith(".pdf"):
                             self.load_pdf_pages(path)
             else:
-                # messagebox.showwarning(
-                #     "Paste Failed", "No valid image or file path found in clipboard!"
-                # )
-                self.show_warning("Paste Failed", "No valid image or file path found in clipboard!")
+                self.show_warning(
+                    "Paste Failed", "No valid image or file path found in clipboard!"
+                )
         except Exception as e:
-            # messagebox.showerror("Error", f"Failed to paste element: {str(e)}")
             self.show_error("Error", f"Failed to paste element:\n{str(e)}")
 
     def process_and_store_image(self, pil_img):
@@ -394,7 +414,7 @@ class ImageToPdfApp:
         lbl_num = tk.Label(
             item_frame,
             text="",
-            font=("Arial", 9, "bold"),
+            font=LAYOUT["font_thumb_num"],
             bg=self.colors["tray_bg"],
             fg=self.colors["card_text"],
         )
@@ -554,7 +574,6 @@ class ImageToPdfApp:
 
     def create_pdf(self):
         if not self.image_list:
-            # messagebox.showwarning("Empty", "No images pasted yet to generate a PDF!")
             self.show_warning("Empty", "No images pasted yet to generate a PDF!")
             return
 
@@ -570,23 +589,20 @@ class ImageToPdfApp:
             first_image = self.image_list[0]
             subsequent_images = self.image_list[1:]
             first_image.save(file_path, save_all=True, append_images=subsequent_images)
-            # messagebox.showinfo(
-            #     "Success",
-            #     f"PDF created successfully with {len(self.image_list)} images!",
-            # )
-            self.show_info("Success", f"PDF created successfully with {len(self.image_list)} images!")
+            self.show_info(
+                "Success",
+                f"PDF created successfully with {len(self.image_list)} images!",
+            )
         except Exception as e:
-            # messagebox.showerror("Error", f"Failed to save PDF:\n{str(e)}")
             self.show_error("Error", f"Failed to save PDF:\n{str(e)}")
 
     def reset_all(self):
         if not self.image_list:
             return
 
-        # if messagebox.askyesno(
-        #     "Confirm Reset", "Are you sure you want to clear all images?"
-        # ):
-        if self.ask_yes_no("Confirm Reset", "Are you sure you want to clear all images?"):
+        if self.ask_yes_no(
+            "Confirm Reset", "Are you sure you want to clear all images?"
+        ):
             self.image_list.clear()
             for data in self.thumb_data:
                 data["frame"].destroy()
@@ -646,10 +662,9 @@ class ImageToPdfApp:
                     print(f"Error parsing asset target payload: {e}")
 
         if not loaded_any:
-            # messagebox.showwarning(
-            #     "Format Warning", "Dropped files must be valid image or PDF formats!"
-            # )
-            self.show_warning("Format Warning", "Dropped files must be valid image or PDF formats!")
+            self.show_warning(
+                "Format Warning", "Dropped files must be valid image or PDF formats!"
+            )
 
     def load_image_from_path(self, path):
         file_img = Image.open(path)
@@ -677,13 +692,6 @@ class ImageToPdfApp:
                 self.process_and_store_image(page)
 
         except PDFInfoNotInstalledError:
-            # messagebox.showerror(
-            #     "System Dependency Missing",
-            #     "Poppler is required to convert PDF files into images.\n\n"
-            #     "Please open your command prompt/terminal and execute:\n"
-            #     "winget install oschwartz10612.Poppler\n\n"
-            #     "Note: Make sure to restart your editor or terminal after it finishes installing!",
-            # )
             self.show_error(
                 "System Dependency Missing",
                 "Poppler is required to convert PDF files into images.\n\n"
@@ -692,25 +700,52 @@ class ImageToPdfApp:
                 "Note: Make sure to restart your editor or terminal after it finishes installing!",
             )
         except Exception as e:
-            # messagebox.showerror(
-            #     "PDF Error", f"Failed to extract pages from PDF:\n{str(e)}"
-            # )
-           self.show_error(
+            self.show_error(
                 "PDF Error", f"Failed to extract pages from PDF:\n{str(e)}"
             )
 
     def show_info(self, title, message):
-        CustomDialog(self.root, title, message, dialog_type="info", colors=self.colors, dark_title_bar_func=set_title_bar_mode)
+        CustomDialog(
+            self.root,
+            title,
+            message,
+            dialog_type="info",
+            colors=self.colors,
+            dark_title_bar_func=set_title_bar_mode,
+        )
 
     def show_warning(self, title, message):
-        CustomDialog(self.root, title, message, dialog_type="warning", colors=self.colors, dark_title_bar_func=set_title_bar_mode)
+        CustomDialog(
+            self.root,
+            title,
+            message,
+            dialog_type="warning",
+            colors=self.colors,
+            dark_title_bar_func=set_title_bar_mode,
+        )
 
     def show_error(self, title, message):
-        CustomDialog(self.root, title, message, dialog_type="error", colors=self.colors, dark_title_bar_func=set_title_bar_mode)
+        CustomDialog(
+            self.root,
+            title,
+            message,
+            dialog_type="error",
+            colors=self.colors,
+            dark_title_bar_func=set_title_bar_mode,
+        )
 
     def ask_yes_no(self, title, message):
-        dialog = CustomDialog(self.root, title, message, dialog_type="yesno", colors=self.colors, dark_title_bar_func=set_title_bar_mode)
+        dialog = CustomDialog(
+            self.root,
+            title,
+            message,
+            dialog_type="yesno",
+            colors=self.colors,
+            dark_title_bar_func=set_title_bar_mode,
+        )
         return dialog.result
+
+
 if __name__ == "__main__":
     root = TkinterDnD.Tk()
     app = ImageToPdfApp(root)

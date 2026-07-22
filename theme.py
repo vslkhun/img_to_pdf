@@ -10,7 +10,8 @@ THEMES = {
         "text": "#333333",
         "subtext": "#666666",
         "card_bg": "#ffffff",
-        "card_selected": "#0078d7",
+        # "card_selected": "#0078d7",
+        "card_selected": "#7D7D7E",
         "card_text": "#000000",
         "card_text_selected": "#ffffff",
         "border": "#cccccc",
@@ -27,18 +28,58 @@ THEMES = {
         "text": "#cccccc",
         "subtext": "#888888",
         "card_bg": "#333333",
-        "card_selected": "#0078d7",
+        # "card_selected": "#0078d7",
+        "card_selected": "#909192",
         "card_text": "#ffffff",
         "card_text_selected": "#ffffff",
         "border": "#3c3c3c",
-        "btn_theme_bg": "#e0e0e0",
-        "btn_theme_hover": "#ffffff",
-        "btn_theme_fg": "#000000",
+        "btn_theme_bg": "#8a8888",
+        "btn_theme_hover": "#c9c7c7",
+        "btn_theme_fg": "#FFFFFF",
         "scrollbar_track": "#2d2d2d",
         "scrollbar_thumb": "#555555",
     },
 }
 
+# Application Layout & Dimension Constants
+LAYOUT = {
+    # Window & Canvas
+    "app_title": "Image to PDF Creator",
+    "window_size": "950x700",
+    "min_window_size": (700, 500),
+    "dialog_size": (380, 180),
+    "default_canvas_size": 350,
+    "default_thumb_size": 70,
+    "thumb_tray_height": 150,
+    "scrollbar_height": 10,
+    # Fonts
+    "font_main": ("Arial", 11),
+    "font_instruction": ("Arial", 11),
+    "font_info": ("Arial", 9, "italic"),
+    "font_bold": ("Arial", 10, "bold"),
+    "font_thumb_num": ("Arial", 9, "bold"),
+    "font_placeholder": ("Arial", 14, "italic"),
+    "font_footer": ("Arial", 8),
+    # Sliders
+    "slider_canvas_range": (200, 600),
+    "slider_thumb_range": (40, 120),
+    "slider_length": 140,
+    "slider_width": 12,
+    # Buttons
+    "btn_reset_size": {"width": 90, "height": 36, "radius": 8},
+    "btn_create_size": {"width": 110, "height": 36, "radius": 8},
+    "btn_theme_size": {"width": 85, "height": 36, "radius": 8},
+    "btn_dialog_yesno_size": {"width": 80, "height": 32, "radius": 6},
+    "btn_dialog_ok_size": {"width": 90, "height": 32, "radius": 6},
+    # Footer
+    "footer_text": {"text": "© 2026 Image to PDF  •  Developed with ❤️ by Veeshel Khundrakpam"},
+    "footer_link": "https://github.com/vslkhun",
+    # Colors independent of light/dark themes
+    "btn_reset_bg": "#9b2118",
+    "btn_reset_hover": "#b62f28",
+    "btn_create_bg": "#1D9E21",
+    "btn_create_hover": "#10a018",
+}
 
 class RoundedButton(tk.Canvas):
     """Custom Canvas-drawn Button with rounded corners and smooth hover states."""
@@ -231,7 +272,7 @@ class CustomDialog(tk.Toplevel):
         self.configure(bg=self.colors["bg"])
 
         # Prevent modal window flickering while calculating geometry
-        self.withdraw()
+        # self.withdraw()
 
         # Update parent layout geometry math
         parent.update_idletasks()
