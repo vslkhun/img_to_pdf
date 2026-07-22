@@ -62,6 +62,8 @@ class ImageToPdfApp:
         self.workspace.grid(row=0, column=0, sticky="nsew")
         self.workspace.columnconfigure(0, weight=1)
         self.workspace.rowconfigure(1, weight=1)
+        self.pan_start_x = 0
+        self.pan_start_y = 0
 
         self.instruction_label = tk.Label(
             self.workspace,
@@ -191,7 +193,7 @@ class ImageToPdfApp:
             bd=0,
             width=LAYOUT["slider_width"],
         )
-        self.canvas_slider.set(self.canvas_size)
+        self.canvas_slider.set(c_max)
         self.canvas_slider.pack(side=tk.LEFT, padx=(0, 20))
         self.canvas_slider.bind("<ButtonRelease-1>", self.on_layout_slider_change)
 
@@ -271,6 +273,9 @@ class ImageToPdfApp:
 
         self.canvas_text = ""
         self.draw_placeholder()
+        # Bind Canvas Panning (Click & Drag to move zoomed image)
+        self.canvas.bind("<ButtonPress-1>", self.on_pan_start)
+        self.canvas.bind("<B1-Motion>", self.on_panning)
 
     def toggle_theme(self):
         self.current_mode = "dark" if self.current_mode == "light" else "light"
@@ -363,9 +368,9 @@ class ImageToPdfApp:
 
         self.rebuild_thumbnails_cache()
         if self.selected_index is not None:
-            self.update_main_canvas(self.image_list[self.selected_index])
+            self.update_main_canvas_on_slide(self.image_list[self.selected_index])
         self.refresh_thumbnail_layout()
-
+        
     def respond_to_canvas_resize(self, event):
         if not self.image_list:
             self.draw_placeholder()
@@ -449,31 +454,57 @@ class ImageToPdfApp:
         for idx in range(len(self.image_list)):
             self.rebuild_single_thumbnail(idx)
 
-    def update_main_canvas(self, pil_img):
+    def update_main_canvas_on_slide(self, pil_img):
         self.root.update_idletasks()
-        cw = self.canvas.winfo_width() - 10
-        ch = self.canvas.winfo_height() - 10
+        
+        # Get actual canvas viewport dimensions (with small 10px margin)
+        cw = max(self.canvas.winfo_width() - 10, 100)
+        ch = max(self.canvas.winfo_height() - 10, 100)
 
-        cw = max(cw, 100)
-        ch = max(ch, 100)
+        img_w, img_h = pil_img.size
 
-        max_w = min(cw, self.canvas_size * 1.5)
-        max_h = min(ch, self.canvas_size)
+        # 1. Calculate the exact "Fit to Canvas" scale factor (contained within bounds)
+        ratio = min(cw / img_w, ch / img_h)
+        
+        # 2. At slider = 100%, width & height equal exact fit-to-canvas dimensions
+        slider_factor = self.canvas_slider.get() / 100.0
+        
+        fit_w = int(img_w * ratio * slider_factor)
+        fit_h = int(img_h * ratio * slider_factor)
 
-        final_w = int(max_w * self.zoom_scale)
-        final_h = int(max_h * self.zoom_scale)
+        fit_w = max(fit_w, 20)
+        fit_h = max(fit_h, 20)
 
-        final_w = max(min(final_w, 3000), 20)
-        final_h = max(min(final_h, 3000), 20)
-
-        display_img = pil_img.copy()
-        display_img.thumbnail((final_w, final_h))
+        # 3. High-quality smooth resize
+        display_img = pil_img.resize((fit_w, fit_h), Image.Resampling.LANCZOS)
         self.current_canvas_tk = ImageTk.PhotoImage(display_img)
 
+        # Render perfectly centered
         self.canvas.delete("all")
         self.canvas.create_image(
-            cw // 2, ch // 2, image=self.current_canvas_tk, anchor=tk.CENTER
+            cw // 2, ch // 2, image=self.current_canvas_tk, anchor=tk.CENTER, tags="img"
         )
+    def update_main_canvas(self, pil_img):
+        self.root.update_idletasks()
+        cw = max(self.canvas.winfo_width() - 10, 100)
+        ch = max(self.canvas.winfo_height() - 10, 100)
+
+        # Reads canvas slider (10% to 100%) and multiplies by zoom_scale
+        scale_factor = (self.canvas_slider.get() / 100.0) * self.zoom_scale
+
+        max_w = int(cw * scale_factor)
+        max_h = int(ch * scale_factor)
+
+        display_img = pil_img.copy()
+        display_img.thumbnail((max(max_w, 20), max(max_h, 20)))
+        self.current_canvas_tk = ImageTk.PhotoImage(display_img)
+
+        # Render centered image on canvas
+        self.canvas.delete("all")
+        self.canvas.create_image(
+            cw // 2, ch // 2, image=self.current_canvas_tk, anchor=tk.CENTER, tags="img"
+        )
+
 
     def refresh_thumbnail_layout(self):
         for data in self.thumb_data:
@@ -745,7 +776,26 @@ class ImageToPdfApp:
         )
         return dialog.result
 
+    def on_pan_start(self, event):
+        """Record starting mouse coordinates when drag begins on canvas."""
+        self.canvas.focus_set()
+        self.pan_start_x = event.x
+        self.pan_start_y = event.y
 
+    def on_panning(self, event):
+        """Move canvas items smoothly based on mouse drag distance."""
+        if not self.image_list:
+            return
+
+        dx = event.x - self.pan_start_x
+        dy = event.y - self.pan_start_y
+
+        # Move the image on the canvas
+        self.canvas.move("all", dx, dy)
+
+        # Update reference points
+        self.pan_start_x = event.x
+        self.pan_start_y = event.y
 if __name__ == "__main__":
     root = TkinterDnD.Tk()
     app = ImageToPdfApp(root)

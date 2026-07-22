@@ -61,7 +61,7 @@ LAYOUT = {
     "font_placeholder": ("Arial", 14, "italic"),
     "font_footer": ("Arial", 8),
     # Sliders
-    "slider_canvas_range": (200, 600),
+    "slider_canvas_range": (10, 100),
     "slider_thumb_range": (40, 120),
     "slider_length": 140,
     "slider_width": 12,
