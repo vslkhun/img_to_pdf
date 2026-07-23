@@ -1,4 +1,5 @@
-# Image to PDF — README
+# <img src="images/logo.png" width="64" height="64" valign="middle"> Image to PDF
+# README
 
 ### Intro
 Image to PDF is a lightweight, cross-platform desktop utility that converts dropped or pasted images and PDF pages into a single compiled PDF. It provides a visual preview, thumbnail ordering, and quick export so you can assemble multi-page PDFs from screenshots, photos, or document scans with ease.
