@@ -47,7 +47,7 @@ LAYOUT = {
     # Window & Canvas
     "app_title": "Image to PDF Creator",
     "window_size": "950x700",
-    "min_window_size": (700, 500),
+    "min_window_size": (850, 550),
     "dialog_size": (380, 180),
     "default_canvas_size": 350,
     "default_thumb_size": 70,
@@ -64,12 +64,12 @@ LAYOUT = {
     # Sliders
     "slider_canvas_range": (10, 100),
     "slider_thumb_range": (40, 120),
-    "slider_length": 140,
+    "slider_length": 100,
     "slider_width": 12,
     # Buttons
     "btn_reset_size": {"width": 90, "height": 36, "radius": 8},
-    "btn_create_size": {"width": 110, "height": 36, "radius": 8},
-    "btn_theme_size": {"width": 85, "height": 36, "radius": 8},
+    "btn_create_size": {"width": 90, "height": 36, "radius": 8},
+    "btn_theme_size": {"width": 90, "height": 36, "radius": 8},
     "btn_dialog_yesno_size": {"width": 80, "height": 32, "radius": 6},
     "btn_dialog_ok_size": {"width": 90, "height": 32, "radius": 6},
     # Footer
@@ -139,6 +139,11 @@ class RoundedButton(tk.Canvas):
         self.delete("all")
         w = self.winfo_width()
         h = self.winfo_height()
+        # If window is collapsing/resizing, fallback to configured requested sizes
+        if w <= 10:
+            w = self.winfo_reqwidth()
+        if h <= 10:
+            h = self.winfo_reqheight()
         r = min(self.radius, h // 2, w // 2)
         fill_color = color or self.normal_bg
 

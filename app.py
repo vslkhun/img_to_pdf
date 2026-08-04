@@ -12,6 +12,14 @@ from tkinterdnd2 import DND_FILES, TkinterDnD
 from theme import LAYOUT, THEMES, CustomDialog, CustomScrollbar, RoundedButton, set_title_bar_mode
 import webbrowser
 
+#features
+from features.page_rotator import PageRotatorFeature
+from features.color_invertor import ColorInverterFeature
+from features.cropper import ImageCropperFeature
+from features.pdf_compressor import PDFCompressorFeature
+from features.image_enhancer import ImageEnhancerFeature
+from features.watermark import WatermarkFeature
+
 class ImageToPdfApp:
     def __init__(self, root):
         self.root = root
@@ -43,7 +51,22 @@ class ImageToPdfApp:
 
         # Auto-scroll on drag state
         self.auto_scroll_job = None
-        self.auto_scroll_speed = 0
+        self.auto_scroll_speed = 0 
+
+        #===============Features==================
+        #Rotation
+        self.rotator = PageRotatorFeature(self)
+        #Colour invert
+        self.color_invertor = ColorInverterFeature(self)
+        #Crop Image
+        self.cropper = ImageCropperFeature(self)
+        #PDF Compressor
+        self.compressor = PDFCompressorFeature(self)
+        #Image Enhancer
+        self.enhancer = ImageEnhancerFeature(self)
+        #Watermarker
+        self.watermarker = WatermarkFeature(self)
+        #==========================================
 
         self.setup_ui()
 
@@ -63,6 +86,24 @@ class ImageToPdfApp:
         # Paste shortcuts
         self.root.bind(f"<{mod}-v>", self.handle_paste)
         self.root.bind(f"<{mod}-V>", self.handle_paste)
+
+        # Rotate shortcuts
+        self.root.bind(f"<{mod}-r>", lambda event: self.rotator.rotate_selected(90))
+        self.root.bind(f"<{mod}-R>", lambda event: self.rotator.rotate_selected(-90))
+
+        # Colour Invert shortcuts
+        self.root.bind(f"<{mod}-i>", lambda event: self.color_invertor.invert_selected())
+        self.root.bind(f"<{mod}-b>", lambda event: self.color_invertor.grayscale_selected())
+        self.root.bind(f"<{mod}-o>", lambda event: self.color_invertor.restore_original_selected())
+
+        #Crop image
+        self.root.bind(f"<{mod}-x>", lambda event: self.cropper.toggle_crop_mode())
+
+        #Image Inhancement
+        self.root.bind(f"<{mod}-e>", lambda event: self.enhancer.open_enhancer_dialog())
+        
+        #Watermarker
+        self.root.bind(f"<{mod}-w>", lambda event: self.watermarker.open_watermark_dialog())
 
 
     def setup_ui(self):
@@ -164,6 +205,7 @@ class ImageToPdfApp:
             pady=8,
         )
         self.toolbar.grid(row=4, column=0, sticky="ew", pady=(5, 0))
+        self.toolbar.grid_propagate(True)
         # Footer Label
         self.lbl_footer = tk.Label(
             self.workspace,
@@ -181,7 +223,7 @@ class ImageToPdfApp:
         # Canvas Preview Size Control
         self.lbl_canvas_icon = tk.Label(
             self.toolbar,
-            text="🖼️ Canvas",
+            text="Canvas",
             font=LAYOUT["font_bold"],
             bg=self.colors["toolbar_bg"],
             fg=self.colors["text"],
@@ -209,7 +251,7 @@ class ImageToPdfApp:
         # Thumbnail Size Control
         self.lbl_thumb_icon = tk.Label(
             self.toolbar,
-            text="🔍 Thumbs",
+            text="Thumbs",
             font=LAYOUT["font_bold"],
             bg=self.colors["toolbar_bg"],
             fg=self.colors["text"],
@@ -235,10 +277,25 @@ class ImageToPdfApp:
         self.thumb_slider.bind("<ButtonRelease-1>", self.on_layout_slider_change)
 
         # Action Buttons
+        compress_cfg = LAYOUT["btn_create_size"]
+        self.btn_compress = RoundedButton(
+            self.toolbar,
+            text="Compress",
+            command=self.compressor.compress_and_export,
+            bg_color="#d97706",
+            hover_color="#b45309",
+            text_color="white",
+            radius=compress_cfg["radius"],
+            width=compress_cfg["width"],
+            height=compress_cfg["height"],
+            font=LAYOUT["font_bold"],
+        )
+        self.btn_compress.pack(side=tk.RIGHT, padx=6)
+
         reset_cfg = LAYOUT["btn_reset_size"]
         self.btn_reset = RoundedButton(
             self.toolbar,
-            text="🗑️ Reset",
+            text="Reset",
             command=self.reset_all,
             bg_color=LAYOUT["btn_reset_bg"],
             hover_color=LAYOUT["btn_reset_hover"],
@@ -253,7 +310,7 @@ class ImageToPdfApp:
         create_cfg = LAYOUT["btn_create_size"]
         self.btn_create = RoundedButton(
             self.toolbar,
-            text="📄 Create PDF",
+            text="Create PDF",
             command=self.create_pdf,
             bg_color=LAYOUT["btn_create_bg"],
             hover_color=LAYOUT["btn_create_hover"],
@@ -268,7 +325,8 @@ class ImageToPdfApp:
         theme_cfg = LAYOUT["btn_theme_size"]
         self.btn_theme = RoundedButton(
             self.toolbar,
-            text="🌙 Theme",
+            #text="☀️ Theme" if self.current_mode == "dark" else "☽Theme",
+            text = "☼Light" if self.current_mode == "dark"  else "☽Dark",
             command=self.toggle_theme,
             bg_color=self.colors["btn_theme_bg"],
             hover_color=self.colors["btn_theme_hover"],
@@ -299,7 +357,8 @@ class ImageToPdfApp:
         self.current_mode = "dark" if self.current_mode == "light" else "light"
         self.colors = THEMES[self.current_mode]
 
-        mode_text = "☀️ Theme" if self.current_mode == "dark" else "🌙 Theme"
+        #mode_text = "☀️ Theme" if self.current_mode == "dark"  else "☽Theme"
+        mode_text = "☼Light" if self.current_mode == "dark"  else "☽Dark"
         self.btn_theme.text = mode_text
         self.btn_theme.update_colors(
             parent_bg=self.colors["toolbar_bg"],
@@ -309,6 +368,7 @@ class ImageToPdfApp:
         )
 
         self.btn_create.update_colors(parent_bg=self.colors["toolbar_bg"])
+        self.btn_compress.update_colors(parent_bg=self.colors["toolbar_bg"])
         self.btn_reset.update_colors(parent_bg=self.colors["toolbar_bg"])
 
         self.scrollbar.update_colors(
@@ -460,6 +520,7 @@ class ImageToPdfApp:
                 "lbl_img": lbl_img,
                 "lbl_num": lbl_num,
                 "tk_thumb": None,
+                "original_copy": pil_img.copy(),
             },
         )
 
@@ -915,6 +976,7 @@ class ImageToPdfApp:
                     "lbl_img": lbl_img,
                     "lbl_num": lbl_num,
                     "tk_thumb": None,
+                    "original_copy": self.image_list[idx].copy()
                 }
             )
 

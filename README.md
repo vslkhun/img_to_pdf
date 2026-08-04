@@ -59,3 +59,15 @@ pip install -r requirements.txt
 |Left Drag|Reorder thumbnails / Pan canvas image when zoomed|
 |Scroll Wheel|Zoom canvas in / out|
 |Right Click|Delete thumbnail|
+|Ctrl + r| 90 rotate clockwise|
+|Ctrl + R| 90 rotate counter-clockwise|
+|Ctrl + i| Invert Colour|
+|Ctrl + b| Convert to grayscale|
+|Ctrl + o| Reset to original|
+|Ctrl + x| Crop image|
+|Ctrl + e| Edit enhancement|
+|Ctrl + w| Add watermark|
+|
+
+
+
