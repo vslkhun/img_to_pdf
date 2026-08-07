@@ -20,6 +20,9 @@ from features.pdf_compressor import PDFCompressorFeature
 from features.image_enhancer import ImageEnhancerFeature
 from features.watermark import WatermarkFeature
 
+#ui
+from ui.left_toolbar import LeftToolbar
+
 class ImageToPdfApp:
     def __init__(self, root):
         self.root = root
@@ -111,7 +114,14 @@ class ImageToPdfApp:
         self.workspace = tk.Frame(self.root, bg=self.colors["bg"], padx=15, pady=10)
         self.workspace.grid(row=0, column=0, sticky="nsew")
         self.workspace.columnconfigure(0, weight=1)
-        self.workspace.rowconfigure(1, weight=1)
+        #self.workspace.rowconfigure(1, weight=1)
+        self.workspace.rowconfigure(0, weight=0)  # Instruction label
+        self.workspace.rowconfigure(1, weight=1)  # CANVAS WORKSPACE (Expands)
+        self.workspace.rowconfigure(2, weight=0)  # Info text
+        self.workspace.rowconfigure(3, weight=0)  # Thumbnail tray
+        self.workspace.rowconfigure(4, weight=0)  # Bottom toolbar
+        self.workspace.rowconfigure(5, weight=0)  # Footer
+
         self.pan_start_x = 0
         self.pan_start_y = 0
 
@@ -124,14 +134,41 @@ class ImageToPdfApp:
         )
         self.instruction_label.grid(row=0, column=0, pady=(0, 5), sticky="ew")
 
+        # --- CENTER CONTAINER (Left Toolbar + Main Workspace) ---
+        self.workspace_frame = tk.Frame(self.workspace, bg=self.colors["bg"])
+        self.workspace_frame.grid(row=1, column=0, sticky="nsew")
+        self.workspace_frame.columnconfigure(1, weight=1)
+        self.workspace_frame.rowconfigure(0, weight=1)
+
+        # 1. Left Photoshop Toolbar
+        self.left_toolbar = LeftToolbar(
+            parent=self.workspace_frame,
+            main_app=self,
+            icons_dir="assets/icons",
+        )
+        #self.left_toolbar.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 6))
+        self.left_toolbar.grid(row=0, column=0, sticky="ns", padx=(0, 6))
+
+        # 2. Main Content Frame (Right of Left Toolbar)
+        self.main_content_frame = tk.Frame(self.workspace_frame, bg=self.colors["bg"])
+        #self.main_content_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.main_content_frame.grid(row=0, column=1, sticky="nsew")
+        self.main_content_frame.columnconfigure(0, weight=1)
+        self.main_content_frame.rowconfigure(0, weight=1)
+
+        #self.main_content_frame.columnconfigure(0, weight=1)
+        #self.main_content_frame.rowconfigure(0, weight=1)
+
         # Main Image Preview Canvas
         self.canvas = tk.Canvas(
-            self.workspace,
+            self.main_content_frame,
+            #self.workspace,
             bg=self.colors["card_bg"],
             highlightthickness=1,
             highlightbackground=self.colors["border"],
         )
-        self.canvas.grid(row=1, column=0, sticky="nsew", pady=5)
+        #self.canvas.grid(row=1, column=0, sticky="nsew", pady=5)
+        self.canvas.grid(row=0, column=0, sticky="nsew", pady=5)
         self.canvas.bind("<Button-1>", lambda e: self.canvas.focus_set())
         self.canvas.bind("<Configure>", self.respond_to_canvas_resize)
         # self.canvas.bind("<MouseWheel>", self.on_canvas_zoom)
@@ -356,6 +393,8 @@ class ImageToPdfApp:
     def toggle_theme(self):
         self.current_mode = "dark" if self.current_mode == "light" else "light"
         self.colors = THEMES[self.current_mode]
+        
+        
 
         #mode_text = "☀️ Theme" if self.current_mode == "dark"  else "☽Theme"
         mode_text = "☼Light" if self.current_mode == "dark"  else "☽Dark"
@@ -366,6 +405,9 @@ class ImageToPdfApp:
             hover_color=self.colors["btn_theme_hover"],
             text_color=self.colors["btn_theme_fg"],
         )
+        # Add to toggle_theme() in app.py:
+        if hasattr(self, "left_toolbar"):
+            self.left_toolbar.update_theme(self.colors["toolbar_bg"])
 
         self.btn_create.update_colors(parent_bg=self.colors["toolbar_bg"])
         self.btn_compress.update_colors(parent_bg=self.colors["toolbar_bg"])
@@ -375,6 +417,12 @@ class ImageToPdfApp:
             track_color=self.colors["scrollbar_track"],
             thumb_color=self.colors["scrollbar_thumb"],
         )
+
+        if hasattr(self, "left_toolbar"):
+            self.left_toolbar.update_theme(
+                new_bg=self.colors["toolbar_bg"],
+                is_dark=(self.current_mode == "dark"),
+            )
 
         self.root.configure(bg=self.colors["bg"])
         self.workspace.config(bg=self.colors["bg"])
@@ -575,26 +623,45 @@ class ImageToPdfApp:
             cw // 2, ch // 2, image=self.current_canvas_tk, anchor=tk.CENTER, tags="img"
         )
     def update_main_canvas(self, pil_img):
-        self.root.update_idletasks()
-        cw = max(self.canvas.winfo_width() - 10, 100)
-        ch = max(self.canvas.winfo_height() - 10, 100)
+        #self.root.update_idletasks()
+        #cw = max(self.canvas.winfo_width() - 10, 100)
+        #ch = max(self.canvas.winfo_height() - 10, 100)
 
-        # Reads canvas slider (10% to 100%) and multiplies by zoom_scale
+        ## Reads canvas slider (10% to 100%) and multiplies by zoom_scale
+        #scale_factor = (self.canvas_slider.get() / 100.0) * self.zoom_scale
+
+        #max_w = int(cw * scale_factor)
+        #max_h = int(ch * scale_factor)
+
+        #display_img = pil_img.copy()
+        #display_img.thumbnail((max(max_w, 20), max(max_h, 20)))
+        #self.current_canvas_tk = ImageTk.PhotoImage(display_img)
+
+        ## Render centered image on canvas
+        #self.canvas.delete("all")
+        #self.canvas.create_image(
+        #    cw // 2, ch // 2, image=self.current_canvas_tk, anchor=tk.CENTER, tags="img"
+        #)
+        self.root.update_idletasks()
+        cw = max(self.canvas.winfo_width() - 20, 100)
+        ch = max(self.canvas.winfo_height() - 20, 100)
+
+        img_w, img_h = pil_img.size
+        
+        # Calculate aspect-ratio scale for the full canvas frame
+        ratio = min(cw / img_w, ch / img_h)
         scale_factor = (self.canvas_slider.get() / 100.0) * self.zoom_scale
 
-        max_w = int(cw * scale_factor)
-        max_h = int(ch * scale_factor)
+        target_w = max(int(img_w * ratio * scale_factor), 20)
+        target_h = max(int(img_h * ratio * scale_factor), 20)
 
-        display_img = pil_img.copy()
-        display_img.thumbnail((max(max_w, 20), max(max_h, 20)))
+        display_img = pil_img.resize((target_w, target_h), Image.Resampling.LANCZOS)
         self.current_canvas_tk = ImageTk.PhotoImage(display_img)
 
-        # Render centered image on canvas
         self.canvas.delete("all")
         self.canvas.create_image(
-            cw // 2, ch // 2, image=self.current_canvas_tk, anchor=tk.CENTER, tags="img"
+            cw // 2 + 10, ch // 2 + 10, image=self.current_canvas_tk, anchor=tk.CENTER, tags="img"
         )
-
 
     def refresh_thumbnail_layout(self):
         for data in self.thumb_data:

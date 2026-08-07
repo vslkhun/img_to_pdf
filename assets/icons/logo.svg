@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <!-- Back Image Card (Representing multiple files) -->
+  <rect x="112" y="128" width="220" height="280" rx="16" fill="#313244" transform="rotate(-8 222 268)"/>
+  
+  <!-- Front Card (PDF Document Container) -->
+  <rect x="160" y="112" width="240" height="300" rx="18" fill="#2563EB"/>
+  
+  <!-- Folded Corner / PDF Accent -->
+  <path d="M 340 112 L 400 172 L 340 172 Z" fill="#60A5FA"/>
+
+  <!-- Sun / Photo Element -->
+  <circle cx="220" cy="200" r="24" fill="#F87171"/>
+
+  <!-- Mountain / Image Graphic -->
+  <path d="M 190 320 L 250 240 L 300 300 L 330 270 L 370 320 Z" fill="#F3F4F6"/>
+
+  <!-- PDF Badge Footer -->
+  <rect x="210" y="340" width="140" height="36" rx="8" fill="#EF4444"/>
+  <text x="280" y="364" font-family="system-ui, sans-serif" font-weight="800" font-size="20" fill="#FFFFFF" text-anchor="middle">IMG->PDF</text>
+</svg>
+

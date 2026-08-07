@@ -50,6 +50,7 @@ pip install -r requirements.txt
    ```bash
    git clone [https://github.com/yourusername/image-to-pdf.git](https://github.com/yourusername/image-to-pdf.git)
    cd image-to-pdf
+   python app.py
 
 ### Keyboard Shortcuts & Controls
 |Shortcut / Action|Function|
@@ -67,7 +68,7 @@ pip install -r requirements.txt
 |Ctrl + x| Crop image|
 |Ctrl + e| Edit enhancement|
 |Ctrl + w| Add watermark|
-|
+
 
 
 
